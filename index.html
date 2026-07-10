@@ -2717,6 +2717,109 @@
       }
     }
 
+  
+    /* =========================================================
+       MOBİL DÜZELTME V20
+       ========================================================= */
+
+    /* Eski mobil kurallar sarı rengi tekrar uygulamasın. */
+    .number-20 {
+      color: #f3b9d5 !important;
+      text-shadow:
+        -2px -2px 0 #ffe8f3,
+        2px 2px 0 #cf7fac,
+        4px 5px 0 #a65083,
+        7px 10px 0 #5e2449,
+        0 16px 18px rgba(0,0,0,.38) !important;
+      filter:
+        drop-shadow(0 5px 5px rgba(0,0,0,.24))
+        drop-shadow(0 0 10px rgba(243,185,213,.30)) !important;
+    }
+
+    /* Mesaj kutusunun bütün mobil tarayıcılarda üstte görünmesini garanti eder. */
+    #noteModal {
+      color: var(--ink);
+      z-index: 9999;
+    }
+
+    #noteModal[open] {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    #noteModal .modal-box {
+      position: relative;
+      z-index: 2;
+    }
+
+    /* showModal desteklemeyen veya sorun çıkaran telefonlar için yedek görünüm. */
+    #noteModal.mobile-fallback-open {
+      display: flex !important;
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      max-width: none !important;
+      height: 100dvh !important;
+      max-height: none !important;
+      margin: 0 !important;
+      padding:
+        max(12px, env(safe-area-inset-top))
+        10px
+        max(12px, env(safe-area-inset-bottom)) !important;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border: 0;
+      background: rgba(7, 3, 15, .78);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    #noteModal.mobile-fallback-open .modal-box {
+      width: min(460px, calc(100vw - 20px));
+      max-height: 86dvh;
+      overflow-y: auto;
+    }
+
+    @media (max-width: 600px) {
+      .number-20 {
+        color: #f3b9d5 !important;
+        bottom: 24px !important;
+      }
+
+      #noteModal {
+        width: calc(100vw - 20px);
+        max-width: 460px;
+        max-height: 90dvh;
+        margin: auto;
+      }
+
+      #noteModal[open]:not(.mobile-fallback-open) {
+        display: block;
+      }
+
+      #noteModal .modal-box {
+        width: 100%;
+        max-height: 86dvh;
+        overflow-y: auto;
+        padding: 34px 20px 22px;
+        border-radius: 22px;
+      }
+
+      #modalText {
+        display: block;
+        color: rgba(43, 23, 8, .88) !important;
+        font-size: 1rem;
+        line-height: 1.6;
+        white-space: normal;
+        overflow-wrap: anywhere;
+      }
+
+      #modalNumber {
+        color: #b77d28 !important;
+      }
+    }
+
   </style>
 </head>
 
@@ -2960,7 +3063,7 @@
     const modalNumber = document.querySelector("#modalNumber");
     const modalText = document.querySelector("#modalText");
 
-    const STORAGE_KEY = "ahsen_20_magic_mobile_v19";
+    const STORAGE_KEY = "ahsen_20_magic_mobile_fixed_v20";
     let blown = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"));
 
     function save() {
@@ -3049,20 +3152,50 @@
       showModal(nextMessageIndex);
     }
 
+    let modalOpenedAt = 0;
+
     function showModal(index) {
       const item = candleMessages[index];
       modalNumber.textContent = `${index + 1}. MUM`;
       modalText.textContent = item.text;
+      modalOpenedAt = Date.now();
 
-      if (typeof modal.showModal === "function") {
-        modal.showModal();
-      } else {
-        alert(`${index + 1}. MUM\n\n${item.text}`);
+      // Önce eski yedek durumları temizle.
+      modal.classList.remove("mobile-fallback-open");
+
+      try {
+        if (typeof modal.showModal === "function") {
+          if (!modal.open) modal.showModal();
+        } else {
+          modal.setAttribute("open", "");
+          modal.classList.add("mobile-fallback-open");
+        }
+      } catch (error) {
+        // Bazı mobil tarayıcılarda dialog API sorun çıkarırsa
+        // mesajı tam ekran yedek görünümle aç.
+        modal.setAttribute("open", "");
+        modal.classList.add("mobile-fallback-open");
       }
+
+      // Mobil tarayıcının kutuyu görünür alana yerleştirmesine yardımcı olur.
+      requestAnimationFrame(() => {
+        const box = modal.querySelector(".modal-box");
+        if (box) box.scrollTop = 0;
+      });
     }
 
     function closeNote() {
-      if (modal.open) modal.close();
+      modal.classList.remove("mobile-fallback-open");
+
+      try {
+        if (modal.open && typeof modal.close === "function") {
+          modal.close();
+        } else {
+          modal.removeAttribute("open");
+        }
+      } catch (error) {
+        modal.removeAttribute("open");
+      }
     }
 
     function update() {
@@ -3265,6 +3398,7 @@
         castTouchWand(event.clientX, event.clientY);
         sparkle(event.clientX, event.clientY, 18);
         blowCandle(index, event);
+        event.stopPropagation();
       }
 
       wandIsDragging = false;
@@ -3335,7 +3469,12 @@
     continueBtn.addEventListener("click", closeNote);
 
     modal.addEventListener("click", (event) => {
-      if (event.target === modal) closeNote();
+      if (event.target !== modal) return;
+
+      // Mum dokunuşundan hemen sonra oluşan ikinci mobil click'i yok say.
+      if (Date.now() - modalOpenedAt < 700) return;
+
+      closeNote();
     });
 
     document.addEventListener("keydown", (event) => {
